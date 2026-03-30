@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>同步器锁止条件计算工具 · 式(3-35) · 汽车设计第3章</title>
+<style>
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue:    #1a5fa8;
+  --blue2:   #2e7dd1;
+  --blue-lt: #e8f2fc;
+  --green:   #1a7a3c;
+  --green-lt:#e6f5ec;
+  --red:     #c0392b;
+  --red-lt:  #fdecea;
+  --orange:  #d4691e;
+  --orange-lt:#fdf3e6;
+  --gray1:   #1c2b3a;
+  --gray2:   #374a5c;
+  --gray3:   #5a6e82;
+  --gray4:   #8fa3b5;
+  --gray5:   #c8d6e0;
+  --gray6:   #e8eff4;
+  --gray7:   #f5f8fb;
+  --bg:      #f0f4f8;
+  --card:    #ffffff;
+  --radius:  10px;
+  --shadow:  0 2px 12px rgba(0,0,0,.09);
+}
+body {
+  font-family: "PingFang SC","Microsoft YaHei",sans-serif;
+  background: var(--bg);
+  color: var(--gray1);
+  min-height: 100vh;
+  padding: 20px 16px 40px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── Layout ── */
+.wrap { max-width: 980px; margin: 0 auto; }
+
+/* ── Header ── */
+.header {
+  background: linear-gradient(135deg, #1a3a5c 0%, #1a5fa8 100%);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 22px 28px 18px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+}
+.header h1 { font-size: 20px; font-weight: 700; letter-spacing: .04em; margin-bottom: 4px; }
+.header p  { font-size: 13px; opacity: .85; }
+.header .tag {
+  display: inline-block; background: rgba(255,255,255,.2);
+  border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-top: 6px;
+}
+
+/* ── Formula Card ── */
+.formula-card {
+  background: var(--card);
+  border: 2px solid var(--blue);
+  border-radius: var(--radius);
+  padding: 18px 24px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+}
+.formula-card h2 { font-size: 14px; color: var(--blue); margin-bottom: 10px; font-weight: 700; }
+.formula-main {
+  font-size: 22px; font-weight: 700;
+  color: var(--gray1);
+  text-align: center;
+  padding: 12px 0;
+  letter-spacing: .03em;
+}
+.formula-main .lt { color: var(--blue2); }
+.formula-main .eq { color: var(--gray3); }
+.formula-vars {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--gray6);
+}
+.var-item {
+  background: var(--gray7); border-radius: 6px;
+  padding: 5px 10px; font-size: 12.5px; color: var(--gray2);
+}
+.var-item b { color: var(--blue); }
+
+/* ── Grid ── */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media(max-width:680px){ .grid { grid-template-columns: 1fr; } }
+
+/* ── Card ── */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+.card h3 {
+  font-size: 13.5px; font-weight: 700;
+  color: var(--gray2); margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--blue-lt);
+  display: flex; align-items: center; gap: 6px;
+}
+.card h3 .icon {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--blue); color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+
+/* ── Param Row ── */
+.param-row { margin-bottom: 16px; }
+.param-row:last-child { margin-bottom: 0; }
+.param-label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 5px;
+}
+.param-label .name { font-size: 13px; color: var(--gray2); font-weight: 600; }
+.param-label .val  {
+  font-size: 16px; font-weight: 700; color: var(--blue);
+  min-width: 70px; text-align: right;
+}
+.param-label .unit { font-size: 11px; color: var(--gray4); margin-left: 2px; }
+
+/* ── Slider ── */
+input[type=range] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 6px;
+  background: var(--gray5); border-radius: 3px; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--blue); border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.2); cursor: pointer;
+  transition: transform .15s;
+}
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.slider-ticks {
+  display: flex; justify-content: space-between;
+  font-size: 10.5px; color: var(--gray4); margin-top: 3px;
+}
+.param-desc { font-size: 11.5px; color: var(--gray4); margin-top: 3px; }
+
+/* ── Number input ── */
+input[type=number] {
+  width: 100%; padding: 6px 10px;
+  border: 1.5px solid var(--gray5); border-radius: 6px;
+  font-size: 14px; color: var(--gray1); outline: none;
+  transition: border-color .2s;
+}
+input[type=number]:focus { border-color: var(--blue2); }
+
+/* ── Result Panel ── */
+.result-panel {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.result-header {
+  background: linear-gradient(90deg, #1a3a5c, #1a5fa8);
+  color: #fff; padding: 14px 22px;
+  font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+}
+.result-body { padding: 20px 22px; }
+
+/* ── Key Numbers ── */
+.key-nums {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 12px;
+  margin-bottom: 18px;
+}
+@media(max-width:500px){ .key-nums { grid-template-columns: 1fr 1fr; } }
+.key-num {
+  background: var(--gray7); border-radius: 8px;
+  padding: 12px 10px; text-align: center;
+}
+.key-num .lbl { font-size: 11.5px; color: var(--gray3); margin-bottom: 4px; }
+.key-num .num { font-size: 22px; font-weight: 700; color: var(--blue); }
+.key-num .unit2{ font-size: 11px; color: var(--gray4); }
+
+/* ── Verdict ── */
+.verdict {
+  border-radius: 8px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 16px; font-weight: 600;
+}
+.verdict.pass { background: var(--green-lt); border: 1.5px solid var(--green); color: var(--green); }
+.verdict.fail { background: var(--red-lt);   border: 1.5px solid var(--red);   color: var(--red);   }
+.verdict .icon-v { font-size: 24px; flex-shrink: 0; }
+.verdict .text   { font-size: 14px; line-height: 1.4; }
+.verdict .text b { font-size: 16px; }
+
+/* ── Margin bar ── */
+.margin-section { margin-bottom: 18px; }
+.margin-label {
+  display: flex; justify-content: space-between;
+  font-size: 12.5px; color: var(--gray3); margin-bottom: 6px;
+}
+.bar-bg {
+  height: 14px; background: var(--gray6); border-radius: 7px; overflow: hidden; position: relative;
+}
+.bar-fill {
+  height: 100%; border-radius: 7px;
+  transition: width .4s ease, background .4s ease;
+}
+.bar-mark {
+  position: absolute; top: 0; height: 100%; width: 2px;
+  background: var(--orange); opacity: .8;
+}
+.bar-mark-label {
+  position: absolute; top: -18px; transform: translateX(-50%);
+  font-size: 10px; color: var(--orange); white-space: nowrap;
+}
+
+/* ── Sensitivity Table ── */
+.sens-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sens-table th {
+  background: var(--blue); color: #fff;
+  padding: 8px 10px; text-align: center; font-weight: 600;
+}
+.sens-table td { padding: 7px 10px; border-bottom: 1px solid var(--gray6); text-align: center; }
+.sens-table tr:last-child td { border-bottom: none; }
+.sens-table tr:nth-child(even) td { background: var(--gray7); }
+.sens-table td.pass { color: var(--green); font-weight: 700; }
+.sens-table td.fail { color: var(--red);   font-weight: 700; }
+.sens-table td.cur  { background: #fff9e0 !important; font-weight: 700; }
+
+/* ── Chart Area ── */
+.chart-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px; box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+.chart-card h3 {
+  font-size: 13.5px; font-weight: 700; color: var(--gray2);
+  margin-bottom: 14px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--blue-lt);
+}
+canvas { width: 100% !important; display: block; }
+
+/* ── Tips ── */
+.tips {
+  background: var(--orange-lt); border: 1px solid #f0c080;
+  border-radius: 8px; padding: 12px 16px;
+  font-size: 12.5px; color: #7a4a10; margin-bottom: 16px;
+}
+.tips b { color: var(--orange); }
+
+/* ── Footer ── */
+.footer {
+  text-align: center; font-size: 11.5px; color: var(--gray4);
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--gray5);
+}
+
+/* ── Toggle ── */
+.toggle-btn {
+  background: var(--blue-lt); color: var(--blue);
+  border: 1.5px solid var(--blue2); border-radius: 6px;
+  padding: 5px 14px; font-size: 12.5px; cursor: pointer;
+  margin-left: auto; display: block; margin-bottom: 10px;
+  font-weight: 600; transition: background .2s;
+}
+.toggle-btn:hover { background: #d0e6f8; }
+
+/* ── Tab ── */
+.tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+.tab {
+  padding: 6px 14px; font-size: 12.5px; border-radius: 6px 6px 0 0;
+  cursor: pointer; border: 1.5px solid var(--gray5);
+  background: var(--gray7); color: var(--gray3); font-weight: 600;
+  border-bottom: none; transition: .2s;
+}
+.tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+user-select: none
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- Header -->
+<div class="header">
+  <h1>🔒 同步器锁止条件计算工具</h1>
+  <p>基于《汽车设计》第5版 第三章 式(3-35) · 锁环式同步器参数交互分析</p>
+  <span class="tag">离线版 · 无需联网 · 数据实时计算</span>
+</div>
+
+<!-- Formula Card -->
+<div class="formula-card">
+  <h2>📐 核心公式 (3-35) — 锁止条件</h2>
+  <div class="formula-main">
+    tan<i>β</i> <span class="lt">&lt;</span>
+    <span style="display:inline-block;text-align:center;vertical-align:middle;margin:0 6px">
+      <span style="display:block;border-bottom:2px solid var(--gray3);padding:0 4px"><i>f</i> · <i>R</i></span>
+      <span style="display:block;padding:0 4px"><i>r</i> · sin<i>α</i></span>
+    </span>
+  </div>
+  <div class="formula-vars">
+    <div class="var-item"><b>β</b> — 锁止面锁止角 (°)</div>
+    <div class="var-item"><b>f</b> — 摩擦锥面摩擦因数</div>
+    <div class="var-item"><b>R</b> — 摩擦锥面平均半径 (mm)</div>
+    <div class="var-item"><b>r</b> — 锁止面平均半径 (mm)</div>
+    <div class="var-item"><b>α</b> — 摩擦锥面半锥角 (°)</div>
+    <div class="var-item"><b>φ</b> = arctan(fR/r·sinα) — 当量摩擦角</div>
+  </div>
+  <div style="font-size:12px;color:var(--gray3);margin-top:10px;">
+    物理意义：满足此条件时，同步器处于锁止状态，接合套无法提前通过锁环，保证同步过程完成后才能换档。
+  </div>
+</div>
+
+<!-- Tips -->
+<div class="tips">
+  <b>💡 使用说明：</b>
+  拖动下方滑块调整各参数，右侧结果面板实时显示锁止角 β 的许用范围及裕度。
+  图表区展示各参数对 φ（当量摩擦角）的影响规律。<br>
+  <b>典型乘用车默认值：</b>f = 0.10，α = 7°，R = 25 mm，r = 20 mm
+</div>
+
+<!-- Main Grid -->
+<div class="grid">
+
+  <!-- Input Panel -->
+  <div class="card">
+    <h3><span class="icon">1</span>输入参数调节</h3>
+
+    <!-- f -->
+    <div class="param-row">
+      <div class="param-label">
+        <span class="name">摩擦因数 <i>f</i></span>
+        <span class="val"><span id="v_f">0.10</span></span>
+      </div>
+      <input type="range" id="s_f" min="0.05" max="0.20" step="0.01" value="0.10"
+             oninput="sync('f',this.value)" onchange="compute()">
+      <div class="slider-ticks"><span>0.05</span><span>0.10</span><span>0.15</span><span>0.20</span></div>
+      <div class="param-desc">铜基粉末冶金: 0.10~0.13 · 钢对铜: 0.07~0.10</div>
+    </div>
+
+    <!-- alpha -->
+    <div class="param-row">
+      <div class="param-label">
+        <span class="name">半锥角 <i>α</i></span>
+        <span class="val"><span id="v_a">7</span><span class="unit">°</span></span>
+      </div>
+      <input type="range" id="s_a" min="5" max="15" step="0.5" value="7"
+             oninput="sync('a',this.value)" onchange="compute()">
+      <div class="slider-ticks"><span>5°</span><span>7°</span><span>10°</span><span>15°</span></div>
+      <div class="param-desc">典型值: 6°~8° · 注意: α 不能小于自锁角</div>
+    </div>
+
+    <!-- R -->
+    <div class="param-row">
+      <div class="param-label">
+        <span class="name">摩擦锥面平均半径 <i>R</i></span>
+        <span class="val"><span id="v_R">25</span><span class="unit">mm</span></span>
+      </div>
+      <input type="range" id="s_R" min="15" max="50" step="1" value="25"
+             oninput="sync('R',this.value)" onchange="compute()">
+      <div class="slider-ticks"><span>15</span><span>25</span><span>35</span><span>50</span></div>
+      <div class="param-desc">增大 R 可提高 φ，有利于锁止可靠性</div>
+    </div>
+
+    <!-- r -->
+    <div class="param-row">
+      <div class="param-label">
+        <span class="name">锁止面平均半径 <i>r</i></span>
+        <span class="val"><span id="v_r">20</span><span class="unit">mm</span></span>
+      </div>
+      <input type="range" id="s_r" min="10" max="40" step="1" value="20"
+             oninput="sync('r',this.value)" onchange="compute()">
+      <div class="slider-ticks"><span>10</span><span>20</span><span>30</span><span>40</span></div>
+      <div class="param-desc">r 增大则 φ 减小，锁止条件更难满足</div>
+    </div>
+
+    <!-- beta (design) -->
+    <div class="param-row" style="border-top:1.5px dashed var(--gray5);padding-top:14px;margin-top:4px;">
+      <div class="param-label">
+        <span class="name" style="color:var(--orange)">设计锁止角 <i>β</i></span>
+        <span class="val" style="color:var(--orange)"><span id="v_b">38</span><span class="unit">°</span></span>
+      </div>
+      <input type="range" id="s_b" min="20" max="60" step="0.5" value="38"
+             oninput="sync('b',this.value)" onchange="compute()">
+      <div class="slider-ticks"><span>20°</span><span>30°</span><span>40°</span><span>60°</span></div>
+      <div class="param-desc">典型设计值: 25°~45° · 过小会导致换档后无法脱锁</div>
+    </div>
+  </div>
+
+  <!-- Result Panel right -->
+  <div>
+    <div class="result-panel">
+      <div class="result-header">📊 实时计算结果</div>
+      <div class="result-body">
+
+        <div class="key-nums">
+          <div class="key-num">
+            <div class="lbl">当量摩擦角 φ</div>
+            <div class="num" id="r_phi">—</div>
+            <div class="unit2">°</div>
+          </div>
+          <div class="key-num">
+            <div class="lbl">tan φ = fR/r·sinα</div>
+            <div class="num" id="r_tanphi">—</div>
+            <div class="unit2">(右侧极限值)</div>
+          </div>
+          <div class="key-num">
+            <div class="lbl">许用 β 上限</div>
+            <div class="num" id="r_blim">—</div>
+            <div class="unit2">° (< φ)</div>
+          </div>
+          <div class="key-num">
+            <div class="lbl">当前 tan β</div>
+            <div class="num" id="r_tanb">—</div>
+            <div class="unit2">(左侧值)</div>
+          </div>
+          <div class="key-num">
+            <div class="lbl">裕度 Δ = φ − β</div>
+            <div class="num" id="r_margin">—</div>
+            <div class="unit2">°</div>
+          </div>
+          <div class="key-num">
+            <div class="lbl">裕度比</div>
+            <div class="num" id="r_ratio">—</div>
+            <div class="unit2">%</div>
+          </div>
+        </div>
+
+        <!-- Verdict -->
+        <div class="verdict" id="verdict">
+          <div class="icon-v" id="verdict_icon">—</div>
+          <div class="text" id="verdict_text">请调整参数</div>
+        </div>
+
+        <!-- Bar -->
+        <div class="margin-section">
+          <div class="margin-label">
+            <span>β = 0°</span>
+            <span id="bar_label">锁止角裕度可视化</span>
+            <span id="bar_max">φ = —°</span>
+          </div>
+          <div class="bar-bg">
+            <div class="bar-fill" id="bar_beta"></div>
+            <div class="bar-mark" id="bar_phi_mark">
+              <div class="bar-mark-label">φ</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--gray4);margin-top:3px;">
+            <span style="color:var(--blue)">■ β (设计值)</span>
+            <span style="color:var(--orange)">│ φ (当量摩擦角上限)</span>
+          </div>
+        </div>
+
+        <!-- Condition breakdown -->
+        <div style="background:var(--gray7);border-radius:8px;padding:12px 14px;font-size:12.5px;">
+          <div style="font-weight:700;color:var(--gray2);margin-bottom:8px;">锁止条件分解核算</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <div>左侧 tan<i>β</i> =</div><div id="c_tanb" style="text-align:right;font-weight:700;color:var(--orange)">—</div>
+            <div>右侧 <i>fR</i>/(<i>r</i>·sin<i>α</i>) =</div><div id="c_rhs" style="text-align:right;font-weight:700;color:var(--blue)">—</div>
+            <div>差值 (右−左) =</div><div id="c_diff" style="text-align:right;font-weight:700;">—</div>
+            <div>条件 tan<i>β</i> < 右侧：</div><div id="c_ok" style="text-align:right;font-weight:700;">—</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart Tabs -->
+<div class="chart-card">
+  <h3>📈 参数影响规律分析图</h3>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab(0)">f 对 φ 的影响</div>
+    <div class="tab" onclick="switchTab(1)">α 对 φ 的影响</div>
+    <div class="tab" onclick="switchTab(2)">R 对 φ 的影响</div>
+    <div class="tab" onclick="switchTab(3)">r 对 φ 的影响</div>
+    <div class="tab" onclick="switchTab(4)">β 裕度综合图</div>
+  </div>
+  <canvas id="mainChart" height="260"></canvas>
+  <div style="text-align:center;font-size:11.5px;color:var(--gray4);margin-top:8px;" id="chartNote"></div>
+</div>
+
+<!-- Sensitivity Table -->
+<div class="card" style="margin-bottom:16px;">
+  <h3><span class="icon">2</span>β 设计值验证表（当前参数下）</h3>
+  <div style="overflow-x:auto;">
+    <table class="sens-table">
+      <thead>
+        <tr>
+          <th>设计锁止角 β (°)</th>
+          <th>tan β</th>
+          <th>右侧极限值 fR/r·sinα</th>
+          <th>裕度 Δ (°)</th>
+          <th>锁止条件</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  《汽车设计》第5版 · 闵海涛 王建华 编著 · 第三章 机械式变速器设计 · 式(3-35) 同步器锁止条件<br>
+  本工具仅供教学辅助使用，计算结果以课本公式为准
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+// ── State ──
+var P = { f:0.10, a:7, R:25, r:20, b:38 };
+var chartInst = null;
+var currentTab = 0;
+
+// ── Sync slider display ──
+function sync(key, val) {
+  P[key] = parseFloat(val);
+  var dp = key === 'f' ? 2 : (key === 'a' || key === 'b' ? 1 : 0);
+  document.getElementById('v_' + key).textContent = parseFloat(val).toFixed(dp);
+  compute();
+}
+
+// ── Core calculation ──
+function calcPhi(f, R, r, a_deg) {
+  var sinA = Math.sin(a_deg * Math.PI / 180);
+  var tanPhi = (f * R) / (r * sinA);
+  var phi_deg = Math.atan(tanPhi) * 180 / Math.PI;
+  return { tanPhi: tanPhi, phi: phi_deg };
+}
+
+function compute() {
+  var res = calcPhi(P.f, P.R, P.r, P.a);
+  var tanPhi = res.tanPhi, phi = res.phi;
+  var tanB = Math.tan(P.b * Math.PI / 180);
+  var pass = tanB < tanPhi;
+  var margin = phi - P.b;
+  var ratio = (margin / phi * 100);
+
+  // Key numbers
+  document.getElementById('r_phi').textContent    = phi.toFixed(2);
+  document.getElementById('r_tanphi').textContent = tanPhi.toFixed(4);
+  document.getElementById('r_blim').textContent   = phi.toFixed(2);
+  document.getElementById('r_tanb').textContent   = tanB.toFixed(4);
+  document.getElementById('r_margin').textContent = margin.toFixed(2);
+  document.getElementById('r_ratio').textContent  = ratio.toFixed(1);
+
+  // Condition breakdown
+  document.getElementById('c_tanb').textContent = tanB.toFixed(4);
+  document.getElementById('c_rhs').textContent  = tanPhi.toFixed(4);
+  var diff = tanPhi - tanB;
+  document.getElementById('c_diff').textContent = (diff >= 0 ? '+' : '') + diff.toFixed(4);
+  document.getElementById('c_diff').style.color = diff >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('c_ok').textContent   = pass ? '✅ 满足' : '❌ 不满足';
+  document.getElementById('c_ok').style.color   = pass ? 'var(--green)' : 'var(--red)';
+
+  // Verdict
+  var vd = document.getElementById('verdict');
+  var vi = document.getElementById('verdict_icon');
+  var vt = document.getElementById('verdict_text');
+  if (pass) {
+    vd.className = 'verdict pass';
+    vi.textContent = '✅';
+    vt.innerHTML = '<b>锁止条件满足！</b><br>tan β = ' + tanB.toFixed(4) +
+      ' &lt; fR/r·sinα = ' + tanPhi.toFixed(4) +
+      '，裕度 Δ = ' + margin.toFixed(2) + '°（' +
+      (margin > 5 ? '裕度充足' : margin > 2 ? '裕度适中' : '裕度偏小，注意磨损影响') + '）';
+  } else {
+    vd.className = 'verdict fail';
+    vi.textContent = '❌';
+    vt.innerHTML = '<b>锁止条件不满足！</b><br>tan β = ' + tanB.toFixed(4) +
+      ' ≥ fR/r·sinα = ' + tanPhi.toFixed(4) +
+      '，β = ' + P.b.toFixed(1) + '° 超过许用上限 φ = ' + phi.toFixed(2) +
+      '°，同步未完成时锁环可能被推开，产生换挡冲击！';
+  }
+
+  // Bar: max scale = 70°
+  var maxDeg = Math.max(70, phi + 10, P.b + 10);
+  var betaPct = Math.min(P.b / maxDeg * 100, 100);
+  var phiPct  = Math.min(phi  / maxDeg * 100, 100);
+  var bar = document.getElementById('bar_beta');
+  bar.style.width = betaPct + '%';
+  bar.style.background = pass ? 'linear-gradient(90deg,#1a5fa8,#2e9de8)' : 'linear-gradient(90deg,#c0392b,#e74c3c)';
+  document.getElementById('bar_phi_mark').style.left  = phiPct + '%';
+  document.getElementById('bar_max').textContent = 'φ = ' + phi.toFixed(2) + '°';
+  document.getElementById('bar_label').textContent = 'β = ' + P.b.toFixed(1) + '°  φ = ' + phi.toFixed(2) + '°';
+
+  // Table
+  buildTable(tanPhi, phi);
+
+  // Chart
+  drawChart();
+}
+
+// ── Table ──
+function buildTable(tanPhi, phi) {
+  var betas = [20, 25, 28, 30, 32, 34, 35, 36, 38, 40, 42, 45, 50, 55, 60];
+  var html = '';
+  betas.forEach(function(b) {
+    var tb = Math.tan(b * Math.PI / 180);
+    var ok = tb < tanPhi;
+    var mg = phi - b;
+    var cur = Math.abs(b - P.b) < 0.3;
+    html += '<tr>';
+    html += '<td class="' + (cur?'cur':'') + '">' + b + (cur?' ←当前':'') + '</td>';
+    html += '<td class="' + (cur?'cur':'') + '">' + tb.toFixed(4) + '</td>';
+    html += '<td class="' + (cur?'cur':'') + '">' + tanPhi.toFixed(4) + '</td>';
+    html += '<td class="' + (cur?'cur':'') + (ok?' pass':' fail') + '">' + mg.toFixed(2) + '°</td>';
+    html += '<td class="' + (cur?'cur':'') + (ok?' pass':' fail') + '">' + (ok?'✅ 满足':'❌ 不满足') + '</td>';
+    html += '</tr>';
+  });
+  document.getElementById('tableBody').innerHTML = html;
+}
+
+// ── Chart ──
+var tabConfigs = [
+  { label:'摩擦因数 f', key:'f', min:0.05, max:0.20, step:0.005,
+    note:'α、R、r 固定，改变 f → φ 随 f 增大而增大（线性比例关系）' },
+  { label:'半锥角 α (°)', key:'a', min:5, max:20, step:0.5,
+    note:'f、R、r 固定，改变 α → α 越小，sinα 越小，φ 越大（锁止更可靠，但接近自锁危险）' },
+  { label:'摩擦锥面半径 R (mm)', key:'R', min:10, max:60, step:1,
+    note:'f、α、r 固定，改变 R → φ 随 R 增大而增大（正比关系）' },
+  { label:'锁止面半径 r (mm)', key:'r', min:8, max:50, step:1,
+    note:'f、α、R 固定，改变 r → φ 随 r 增大而减小（反比关系）' },
+  { label:'设计锁止角 β (°)', key:'b', min:20, max:60, step:0.5,
+    note:'综合图：显示当前参数下 φ 的值（横线），β 的扫描曲线，绿色区域=满足条件，红色区域=不满足' }
+];
+
+function switchTab(i) {
+  currentTab = i;
+  var tabs = document.querySelectorAll('.tab');
+  tabs.forEach(function(t,j){ t.className = 'tab' + (j===i?' active':''); });
+  drawChart();
+}
+
+function drawChart() {
+  var cfg = tabConfigs[currentTab];
+  var ctx = document.getElementById('mainChart').getContext('2d');
+
+  // Generate data
+  var xs = [], yPhis = [], yTanBs = [], yMargins = [];
+  var steps = 80;
+  var range = cfg.max - cfg.min;
+  for (var i = 0; i <= steps; i++) {
+    var xv = cfg.min + (range / steps) * i;
+    xs.push(parseFloat(xv.toFixed(3)));
+
+    var f = P.f, a = P.a, R = P.R, r = P.r, b = P.b;
+    if (cfg.key==='f') f=xv;
+    else if (cfg.key==='a') a=xv;
+    else if (cfg.key==='R') R=xv;
+    else if (cfg.key==='r') r=xv;
+    else if (cfg.key==='b') b=xv;
+
+    var res = calcPhi(f, R, r, a);
+    yPhis.push(parseFloat(res.phi.toFixed(3)));
+
+    if (cfg.key==='b') {
+      yTanBs.push(parseFloat(b.toFixed(3)));
+      yMargins.push(parseFloat((res.phi - b).toFixed(3)));
+    }
+  }
+
+  // Current x value
+  var curX = P[cfg.key];
+  var curRes = calcPhi(P.f, P.R, P.r, P.a);
+  var curPhi = curRes.phi;
+
+  // Canvas draw
+  var canvas = document.getElementById('mainChart');
+  canvas.width  = canvas.parentElement.clientWidth - 40;
+  canvas.height = 260;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  var W = canvas.width, H = canvas.height;
+  var pad = { top:30, right:20, bottom:40, left:52 };
+  var cw = W - pad.left - pad.right;
+  var ch = H - pad.top  - pad.bottom;
+
+  // Y range
+  var allY = yPhis.concat(yTanBs).concat(yMargins.filter(function(v){return v>-100;}));
+  var yMin = Math.min.apply(null, allY) - 2;
+  var yMax = Math.max.apply(null, allY) + 4;
+  yMin = Math.min(yMin, 0);
+
+  function px(xv) { return pad.left + (xv - cfg.min) / range * cw; }
+  function py(yv) { return pad.top + (1 - (yv - yMin)/(yMax - yMin)) * ch; }
+
+  // Grid
+  ctx.strokeStyle = '#e0e8ef'; ctx.lineWidth = 1;
+  for (var gi = 0; gi <= 5; gi++) {
+    var gv = yMin + (yMax - yMin) * gi / 5;
+    var gy = py(gv);
+    ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(pad.left+cw, gy);
+    ctx.stroke();
+    ctx.fillStyle = '#8fa3b5'; ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(gv.toFixed(1)+'°', pad.left-5, gy+4);
+  }
+
+  // X ticks
+  var xTicks = 6;
+  for (var xi = 0; xi <= xTicks; xi++) {
+    var xv2 = cfg.min + range * xi / xTicks;
+    var gx2 = px(xv2);
+    ctx.strokeStyle = '#e0e8ef'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(gx2, pad.top); ctx.lineTo(gx2, pad.top+ch); ctx.stroke();
+    ctx.fillStyle = '#8fa3b5'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(xv2.toFixed(1), gx2, pad.top+ch+16);
+  }
+
+  // Zero line
+  if (yMin < 0 && yMax > 0) {
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, py(0)); ctx.lineTo(pad.left+cw, py(0)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Fill zones for tab 4
+  if (cfg.key === 'b') {
+    // green zone (β < φ), red zone (β >= φ)
+    var crossX = curPhi; // where β = φ
+    // green: x < crossX
+    if (crossX > cfg.min) {
+      var x1g = px(cfg.min), x2g = px(Math.min(crossX, cfg.max));
+      ctx.fillStyle = 'rgba(26,122,60,0.08)';
+      ctx.fillRect(x1g, pad.top, x2g - x1g, ch);
+    }
+    if (crossX < cfg.max) {
+      var x1r = px(Math.max(crossX, cfg.min)), x2r = px(cfg.max);
+      ctx.fillStyle = 'rgba(192,57,43,0.08)';
+      ctx.fillRect(x1r, pad.top, x2r - x1r, ch);
+    }
+    // φ horizontal line
+    ctx.strokeStyle = '#1a5fa8'; ctx.lineWidth = 2; ctx.setLineDash([6,3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, py(curPhi)); ctx.lineTo(pad.left+cw, py(curPhi)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#1a5fa8'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('φ = ' + curPhi.toFixed(2) + '°', pad.left+4, py(curPhi)-5);
+
+    // β line (y=x diagonal)
+    ctx.strokeStyle = '#d4691e'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    xs.forEach(function(xv3, i3) {
+      var yv3 = yTanBs[i3];
+      if (i3===0) ctx.moveTo(px(xv3), py(yv3));
+      else ctx.lineTo(px(xv3), py(yv3));
+    });
+    ctx.stroke();
+
+    // margin curve
+    ctx.strokeStyle = '#888'; ctx.lineWidth = 1.5; ctx.setLineDash([3,2]);
+    ctx.beginPath();
+    xs.forEach(function(xv3, i3) {
+      var yv3 = yMargins[i3];
+      if (i3===0) ctx.moveTo(px(xv3), py(yv3));
+      else ctx.lineTo(px(xv3), py(yv3));
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+  } else {
+    // φ curve (blue)
+    ctx.strokeStyle = '#1a5fa8'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    xs.forEach(function(xv3, i3) {
+      if (i3===0) ctx.moveTo(px(xv3), py(yPhis[i3]));
+      else ctx.lineTo(px(xv3), py(yPhis[i3]));
+    });
+    ctx.stroke();
+
+    // current β line
+    ctx.strokeStyle = '#d4691e'; ctx.lineWidth = 1.8; ctx.setLineDash([5,3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, py(P.b)); ctx.lineTo(pad.left+cw, py(P.b)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#d4691e'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText('β = ' + P.b.toFixed(1) + '°', pad.left+cw-2, py(P.b)-5);
+
+    // shade pass/fail
+    for (var si = 0; si < xs.length-1; si++) {
+      var yp1 = yPhis[si], yp2 = yPhis[si+1];
+      var isPass = yp1 > P.b;
+      ctx.fillStyle = isPass ? 'rgba(26,122,60,0.07)' : 'rgba(192,57,43,0.07)';
+      ctx.fillRect(px(xs[si]), pad.top, px(xs[si+1])-px(xs[si]), ch);
+    }
+  }
+
+  // Current value vertical line
+  if (curX >= cfg.min && curX <= cfg.max) {
+    ctx.strokeStyle = 'rgba(212,105,30,0.6)'; ctx.lineWidth = 1.8; ctx.setLineDash([3,2]);
+    ctx.beginPath(); ctx.moveTo(px(curX), pad.top); ctx.lineTo(px(curX), pad.top+ch); ctx.stroke();
+    ctx.setLineDash([]);
+    // dot
+    ctx.fillStyle = '#d4691e';
+    ctx.beginPath(); ctx.arc(px(curX), py(curPhi), 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(px(curX), py(curPhi), 2.5, 0, Math.PI*2); ctx.fill();
+  }
+
+  // Axes
+  ctx.strokeStyle = '#8fa3b5'; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top+ch);
+  ctx.lineTo(pad.left+cw, pad.top+ch); ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = '#374a5c'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(cfg.label, pad.left + cw/2, H-4);
+  ctx.save(); ctx.translate(13, pad.top + ch/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('当量摩擦角 φ (°)', 0, 0); ctx.restore();
+
+  // Title
+  ctx.fillStyle = '#1a3a5c'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+  var titleTxt = cfg.key === 'b'
+    ? 'β 裕度综合图（φ = ' + curPhi.toFixed(2) + '°）'
+    : cfg.label + ' 对当量摩擦角 φ 的影响';
+  ctx.fillText(titleTxt, pad.left + cw/2, pad.top - 8);
+
+  // Legend
+  ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+  if (cfg.key === 'b') {
+    ctx.fillStyle = '#1a5fa8'; ctx.fillRect(pad.left, pad.top+ch+22, 18, 2);
+    ctx.fillText('φ（当量摩擦角，不随β变化）', pad.left+22, pad.top+ch+26);
+    ctx.fillStyle = '#d4691e'; ctx.fillRect(pad.left+220, pad.top+ch+22, 18, 2);
+    ctx.fillText('β（锁止角扫描线）', pad.left+242, pad.top+ch+26);
+  } else {
+    ctx.fillStyle = '#1a5fa8'; ctx.fillRect(pad.left, pad.top+ch+22, 18, 3);
+    ctx.fillText('φ（当量摩擦角）', pad.left+22, pad.top+ch+26);
+    ctx.fillStyle = '#d4691e'; ctx.fillRect(pad.left+160, pad.top+ch+22, 18, 2);
+    ctx.fillText('β = ' + P.b.toFixed(1) + '°（当前设计值）', pad.left+182, pad.top+ch+26);
+  }
+
+  // Note
+  document.getElementById('chartNote').textContent = cfg.note;
+}
+
+// ── Init ──
+window.addEventListener('resize', function(){ drawChart(); });
+compute();
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('keydown', e => {
+if (e.key === 'F12' || 
+(e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) ||
+(e.ctrlKey && e.key === 'U') ||
+(e.ctrlKey && e.key === 'S')) {
+e.preventDefault();
+return false;
+}
+});
+
+</script>
+<script>
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  document.addEventListener('keydown', e => {
+    if (e.key === 'F12' || 
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) ||
+        (e.ctrlKey && e.key === 'U') ||
+        (e.ctrlKey && e.key === 'S')) {
+      e.preventDefault();
+      return false;
+    }
+  });
+</script>
+
+</body>
+</html>
